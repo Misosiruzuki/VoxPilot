@@ -1,0 +1,22 @@
+{
+  "name": "walk-third-person",
+  "launchServer": true,
+  "totalFrames": 100,
+  "captureEvery": 10,
+  "warmupFrames": 20,
+  "closeClient": true,
+  "display": { "background": true },
+  "commands": [
+    "time set day",
+    "weather clear",
+    "tp Dev 0 -60 0",
+    "fill -4 -61 -4 4 -61 4 minecraft:stone",
+    "setblock 0 -60 5 minecraft:gold_block"
+  ],
+  "actions": [
+    { "fromFrame": 0, "toFrame": 29, "camera": "first", "keys": { "forward": true } },
+    { "fromFrame": 30, "toFrame": 69, "camera": "third_back", "keys": { "forward": true, "sprint": true } },
+    { "fromFrame": 70, "toFrame": 79, "camera": "third_front", "keys": { "jump": true } },
+    { "fromFrame": 80, "toFrame": 99, "camera": "third_back", "deltaYaw": 2.0, "keys": { "forward": true } }
+  ]
+}

@@ -1,0 +1,20 @@
+# Build products and caches
+.gradle/
+**/build/
+**/.idea/
+**/.classpath
+**/.project
+**/.settings/
+
+# Local runtime data and reports
+run/
+sample-report/
+BUILD-REPORT.md
+
+# Release binary is attached to GitHub Releases
+VoxPilot.jar
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.log

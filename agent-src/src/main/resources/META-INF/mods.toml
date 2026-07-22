@@ -1,0 +1,23 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="voxpilot_agent"
+version="${project.version}"
+displayName="VoxPilot Agent"
+description='''Frame-synchronised localhost automation agent for VoxPilot.'''
+
+[[dependencies.voxpilot_agent]]
+modId="forge"
+mandatory=true
+versionRange="[${forge_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.voxpilot_agent]]
+modId="minecraft"
+mandatory=true
+versionRange="[${minecraft_version},1.21)"
+ordering="NONE"
+side="BOTH"
