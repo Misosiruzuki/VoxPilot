@@ -33,6 +33,7 @@ public final class Main {
 
         String sourceScenario = Files.readString(scenarioPath, StandardCharsets.UTF_8).trim();
         boolean launchServer = booleanField(sourceScenario, "launchServer", true);
+        String singleplayerWorld = stringField(sourceScenario, "singleplayerWorld", "");
         String javaHome = option(args, "--java-home", discoverJava17());
         Path reportsRoot = project.resolve("run").resolve("voxpilot-reports");
         Path reportDir = reportsRoot.resolve(RUN_ID.format(LocalDateTime.now()));
@@ -49,9 +50,14 @@ public final class Main {
                 server = launch(project, javaHome, reportDir.resolve("server.log"), "runServer");
                 waitForText(reportDir.resolve("server.log"), "Done (", 240);
             }
-            String quickPlay = launchServer
-                    ? "--quickPlayMultiplayer 127.0.0.1:25565 --width 854 --height 480"
-                    : "--width 854 --height 480";
+            String quickPlay;
+            if (launchServer) {
+                quickPlay = "--quickPlayMultiplayer 127.0.0.1:25565 --width 854 --height 480";
+            } else if (!singleplayerWorld.isBlank()) {
+                quickPlay = "--quickPlaySingleplayer " + singleplayerWorld + " --width 854 --height 480";
+            } else {
+                quickPlay = "--width 854 --height 480";
+            }
             client = launch(project, javaHome, reportDir.resolve("client.log"), "runClient", "--args=" + quickPlay);
             runScenario(scenario, reportDir.resolve("frames.jsonl"));
             waitForExit(client, 60);
@@ -82,7 +88,7 @@ public final class Main {
              BufferedReader in = new BufferedReader(new InputStreamReader(connectedSocket.getInputStream(), StandardCharsets.UTF_8));
              BufferedWriter out = new BufferedWriter(new OutputStreamWriter(connectedSocket.getOutputStream(), StandardCharsets.UTF_8));
              BufferedWriter frames = Files.newBufferedWriter(framesLog, StandardCharsets.UTF_8)) {
-            connectedSocket.setSoTimeout(240_000);
+            connectedSocket.setSoTimeout(900_000);
             String ready = in.readLine();
             if (ready == null || !ready.contains("agent_ready")) throw new IOException("Invalid agent greeting: " + ready);
             out.write(scenario.replace("\r", "").replace("\n", "")); out.newLine(); out.flush();
@@ -177,6 +183,16 @@ public final class Main {
         if (compact.contains("\"" + field.toLowerCase(Locale.ROOT) + "\":false")) return false;
         if (compact.contains("\"" + field.toLowerCase(Locale.ROOT) + "\":true")) return true;
         return fallback;
+    }
+
+    private static String stringField(String json, String field, String fallback) {
+        String marker = "\"" + field + "\"";
+        int key = json.indexOf(marker);
+        if (key < 0) return fallback;
+        int colon = json.indexOf(':', key + marker.length());
+        int start = colon < 0 ? -1 : json.indexOf('"', colon + 1);
+        int end = start < 0 ? -1 : json.indexOf('"', start + 1);
+        return start < 0 || end < 0 ? fallback : json.substring(start + 1, end);
     }
 
     private static void validateProject(Path project) {

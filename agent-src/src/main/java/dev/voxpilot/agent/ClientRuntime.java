@@ -10,7 +10,10 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -127,6 +130,23 @@ public final class ClientRuntime {
 
     private static void sendSceneCommands(Minecraft mc) {
         JsonArray commands = scenario.has("commands") ? scenario.getAsJsonArray("commands") : new JsonArray();
+        MinecraftServer integratedServer = mc.getSingleplayerServer();
+        if (integratedServer != null) {
+            List<String> queued = new ArrayList<>();
+            for (JsonElement item : commands) {
+                String command = item.getAsString();
+                queued.add(command.startsWith("/") ? command.substring(1) : command);
+            }
+            integratedServer.execute(() -> {
+                for (String command : queued) {
+                    integratedServer.getCommands().performPrefixedCommand(
+                            integratedServer.createCommandSourceStack().withPermission(4),
+                            command);
+                }
+            });
+            commandsSent = true;
+            return;
+        }
         for (JsonElement item : commands) {
             String command = item.getAsString();
             mc.player.connection.sendCommand(command.startsWith("/") ? command.substring(1) : command);
@@ -139,6 +159,10 @@ public final class ClientRuntime {
         for (Action action : ACTIONS) {
             if (!action.contains(frame)) continue;
             JsonObject data = action.data;
+            if (data.has("rawKey")) {
+                MinecraftForge.EVENT_BUS.post(new InputEvent.Key(
+                        data.get("rawKey").getAsInt(), 0, GLFW.GLFW_PRESS, 0));
+            }
             if (data.has("keys")) applyKeys(mc.options, data.getAsJsonObject("keys"));
             if (data.has("camera")) {
                 String camera = data.get("camera").getAsString().toLowerCase(Locale.ROOT);
