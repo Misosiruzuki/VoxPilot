@@ -1,4 +1,4 @@
-# VoxPilot 1.1
+# VoxPilot 1.2
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -39,6 +39,27 @@ java -jar VoxPilot.jar report --dir 'C:\path\to\report'
 
 F8thfulは`run/resourcepacks/F8thful-v6.0.zip`へ配置され、`run/options.txt`の
 `resourcePacks`へ追加されるためデフォルトで有効になります。既存のリソースパック指定は保持します。
+
+### 最大軽量化プロファイル
+
+初回実行時に、クライアントとサーバーへ次の軽量化設定も読み込みます。
+
+- 描画距離6、シミュレーション距離5、Fast描画、最小パーティクル、雲・影・ビネット・AO停止
+- Embeddiumの可視面・フォグ・エンティティカリング、コンパクト頂点、遅延チャンク更新を有効化
+- Entity Cullingのブロックエンティティ／葉越しカリングを強化し、判定頻度と追跡距離を軽量化
+- FerriteCoreの省メモリブロックステート表現を有効化
+- ServerCoreの動的描画／シミュレーション距離、スポーンチャンク停止、XP・アイテム統合、村人軽量化、Activation Rangeを有効化
+- ローカル専用サーバーではネットワーク圧縮を省略してCPU負荷を削減
+
+設定はプロファイルごとに一度だけ適用します。適用前のファイルは
+`run/voxpilot-config-backup/`（専用サーバーは`run-server/voxpilot-config-backup/`）へ退避されます。
+以後は利用者が変更した設定をVoxPilotが上書きしません。再適用したい場合は、該当する
+`voxpilot-performance-*-v1.applied`を削除してください。
+
+最大軽量化のため、ServerCoreのActivation Range、スポーン頻度、流体tick最適化など、
+遠距離Mob・装置・流体の挙動をわずかに変える設定を含みます。完全なバニラ同等性を検査する場合は
+バックアップへ戻すか、該当設定だけ無効化してください。ImmediatelyFastのエラーチェック停止など、
+描画破損を起こしやすい実験設定はテストの信頼性を優先して有効化していません。
 
 専用サーバーを同時起動するシナリオでは、サーバーを`run-server/`、クライアントを`run/`へ分離します。
 共通・サーバー用Modだけを`run-server/mods`へ、共通・クライアント用Modだけを`run/mods`へ導入するため、

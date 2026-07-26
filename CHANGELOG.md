@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- 初回だけ読み込む最大軽量化プロファイルを追加
+- Minecraft、Embeddium、ImmediatelyFast、Entity Culling、FerriteCore、ServerCoreを自動設定
+- 適用前コンフィグの自動バックアップと、以後の手動設定を保持する適用マーカーを追加
+- 専用テストサーバーのシミュレーション距離を5へ縮小し、localhost通信の圧縮を停止
+
 ## 1.1.0
 
 - Forge 1.20.1 MDKで実測済みの既定軽量化構成を自動導入

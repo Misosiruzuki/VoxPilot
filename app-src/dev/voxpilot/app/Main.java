@@ -149,7 +149,7 @@ public final class Main {
         Files.createDirectories(run);
         Files.writeString(run.resolve("eula.txt"), "eula=true\n", StandardCharsets.UTF_8);
         String properties = "online-mode=false\nserver-port=25565\nlevel-name=VoxPilotWorld\nlevel-type=minecraft:flat\n" +
-                "gamemode=creative\ndifficulty=peaceful\nspawn-protection=0\nview-distance=6\nsimulation-distance=6\nmotd=VoxPilot local test\n";
+                "gamemode=creative\ndifficulty=peaceful\nspawn-protection=0\nview-distance=6\nsimulation-distance=5\nnetwork-compression-threshold=-1\nmotd=VoxPilot local test\n";
         Files.writeString(run.resolve("server.properties"), properties, StandardCharsets.UTF_8);
         UUID devUuid = UUID.nameUUIDFromBytes("OfflinePlayer:Dev".getBytes(StandardCharsets.UTF_8));
         String ops = "[{\"uuid\":\"" + devUuid + "\",\"name\":\"Dev\",\"level\":4,\"bypassesPlayerLimit\":true}]\n";
@@ -249,5 +249,5 @@ public final class Main {
     private static Path requiredPath(String[] args, String key) { String value = option(args, key, null); if (value == null) throw new IllegalArgumentException("Missing " + key); return Path.of(value); }
     private static String option(String[] args, String key, String fallback) { for (int i=0;i<args.length-1;i++) if (key.equals(args[i])) return args[i+1]; return fallback; }
     private static boolean has(String[] args, String key) { for (String arg : args) if (key.equals(arg)) return true; return false; }
-    private static void usage() { System.out.println("VoxPilot 1.1\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
+    private static void usage() { System.out.println("VoxPilot 1.2\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
 }

@@ -36,7 +36,7 @@ final class DefaultPerformancePack {
     }
 
     private static final String USER_AGENT =
-            "VoxPilot/1.1.0 (+https://github.com/Misosiruzuki/VoxPilot)";
+            "VoxPilot/1.2.0 (+https://github.com/Misosiruzuki/VoxPilot)";
     private static final String RESOURCE_PACK_FILENAME = "F8thful-v6.0.zip";
     private static final String RESOURCE_PACK_URL =
             "https://edge.forgecdn.net/files/4672/794/F8thful.zip";
@@ -133,6 +133,7 @@ final class DefaultPerformancePack {
 
     void prepareServerSide(boolean dedicated) throws Exception {
         Path destination = dedicated ? dedicatedServerMods : mods;
+        DefaultPerformanceConfig.applyServer(dedicated ? dedicatedServerRun : run);
         Files.createDirectories(destination);
         Files.createDirectories(cache);
         for (Artifact artifact : ARTIFACTS) {
@@ -157,6 +158,7 @@ final class DefaultPerformancePack {
     }
 
     void prepareClientSide(boolean dedicated) throws Exception {
+        DefaultPerformanceConfig.applyClient(run);
         if (dedicated) {
             installSides(mods, Side.COMMON, Side.CLIENT);
         } else {
