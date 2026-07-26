@@ -1,4 +1,4 @@
-# VoxPilot 1.0
+# VoxPilot 1.1
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -23,6 +23,32 @@ java -jar 'VoxPilot.jar' run `
 ```powershell
 java -jar VoxPilot.jar report --dir 'C:\path\to\report'
 ```
+
+## デフォルト軽量化構成
+
+`run`を実行すると、Forge 1.20.1用の次の構成を各作者の公式配布先から自動取得します。
+ダウンロードはSHA-512で検証され、`run/voxpilot-cache/performance/`へ保存されるため、
+2回目以降はネットワークへ再取得せずに使えます。
+
+| 対象 | 導入内容 |
+|---|---|
+| クライアント・サーバー | ModernFix 5.27.66、FerriteCore 6.0.1 |
+| サーバー・シングルプレイ | ServerCore 1.5.2 |
+| クライアント | Embeddium 0.3.31、ImmediatelyFast 1.2.4、Entity Culling 1.7.4（いずれも1.20.1ネイティブ版） |
+| リソースパック | F8thful v6.0（8x8、Minecraft 1.20.1） |
+
+F8thfulは`run/resourcepacks/F8thful-v6.0.zip`へ配置され、`run/options.txt`の
+`resourcePacks`へ追加されるためデフォルトで有効になります。既存のリソースパック指定は保持します。
+
+専用サーバーを同時起動するシナリオでは、サーバーを`run-server/`、クライアントを`run/`へ分離します。
+共通・サーバー用Modだけを`run-server/mods`へ、共通・クライアント用Modだけを`run/mods`へ導入するため、
+Embeddiumなどを専用サーバーへ読み込ませず、実行中のmodsディレクトリも変更しません。導入ファイルの配布元とライセンスは
+[`THIRD-PARTY.md`](THIRD-PARTY.md)に記載しています。第三者ファイルはVoxPilot.jarへ同梱していません。
+
+配布用Modの難読化名は、対象MDKのForgeGradleを一時初期化スクリプトから呼び出して
+`run/voxpilot-cache/performance-remapped/`へ再マッピングします。対象の`build.gradle`は変更しません。
+BadOptimizations 2.4.1はこの開発用変換後に一部Mixinが不正なスタックフレームを生成するため除外しています。
+VoxPilotでは実測でエラーなく完走できた組み合わせだけを採用します。
 
 ## JSONシナリオ
 
@@ -98,4 +124,6 @@ VoxPilotはWindowsの `SendInput` やマウス移動を使いません。localho
 
 現バージョンはForge 1.20.1 / Forge 47.xの**開発用MDK**に対応します。他の1.20.1 Modでは `--project` をそのMDKルートへ変えるだけです。製品版Minecraftランチャー、NeoForge、Fabric、別Minecraftバージョンには、それぞれ対応エージェントのビルドが必要です。
 
-VoxPilotは対象MDKの `run/mods/voxpilot-agent-1.0.0.jar`、`run/eula.txt`、`run/server.properties`、`run/ops.json`、テストワールドとレポートを作成します。Modの `src/` や `build.gradle` は変更しません。
+VoxPilotは対象MDKの `run/mods/voxpilot-agent-1.0.0.jar`、既定軽量化Mod、
+`run/resourcepacks/F8thful-v6.0.zip`、`run/eula.txt`、`run/server.properties`、`run/ops.json`、
+テストワールドとレポートを作成します。Modの `src/` や `build.gradle` は変更しません。

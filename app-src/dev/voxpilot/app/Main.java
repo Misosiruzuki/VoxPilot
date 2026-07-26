@@ -41,15 +41,27 @@ public final class Main {
         String scenario = addOutputDir(sourceScenario, reportDir);
         Files.writeString(reportDir.resolve("scenario.resolved.json"), scenario, StandardCharsets.UTF_8);
 
-        installAgent(project);
+        DefaultPerformancePack performancePack = new DefaultPerformancePack(project, javaHome);
+        performancePack.prepareServerSide(launchServer);
+        Path initialRun = launchServer ? performancePack.dedicatedServerRun() : project.resolve("run");
+        installAgent(initialRun);
         Process server = null;
         Process client = null;
         try {
             if (launchServer) {
-                configureServer(project);
-                server = launch(project, javaHome, reportDir.resolve("server.log"), "runServer");
+                configureServer(performancePack.dedicatedServerRun());
+                Path serverInit = writeDedicatedServerInit(project);
+                server = launch(
+                        project,
+                        javaHome,
+                        reportDir.resolve("server.log"),
+                        "-I",
+                        serverInit.toString(),
+                        "runServer");
                 waitForText(reportDir.resolve("server.log"), "Done (", 240);
             }
+            performancePack.prepareClientSide(launchServer);
+            if (launchServer) installAgent(project.resolve("run"));
             String quickPlay;
             if (launchServer) {
                 quickPlay = "--quickPlayMultiplayer 127.0.0.1:25565 --width 854 --height 480";
@@ -109,13 +121,22 @@ public final class Main {
         builder.directory(project.toFile());
         builder.environment().put("JAVA_HOME", javaHome);
         builder.environment().put("PATH", javaHome + "\\bin;" + builder.environment().getOrDefault("PATH", ""));
+        Path refMap = project.resolve("build").resolve("createSrgToMcp").resolve("output.srg");
+        String inheritedJavaOptions = builder.environment().getOrDefault("JAVA_TOOL_OPTIONS", "").trim();
+        String mixinRemapOptions = "-Dmixin.env.remapRefMap=true "
+                + "-Dmixin.env.refMapRemappingFile=\"" + refMap + "\"";
+        builder.environment().put(
+                "JAVA_TOOL_OPTIONS",
+                inheritedJavaOptions.isEmpty()
+                        ? mixinRemapOptions
+                        : inheritedJavaOptions + " " + mixinRemapOptions);
         builder.redirectErrorStream(true);
         builder.redirectOutput(log.toFile());
         return builder.start();
     }
 
-    private static void installAgent(Path project) throws IOException {
-        Path mods = project.resolve("run").resolve("mods");
+    private static void installAgent(Path run) throws IOException {
+        Path mods = run.resolve("mods");
         Files.createDirectories(mods);
         Path target = mods.resolve("voxpilot-agent-1.0.0.jar");
         try (InputStream input = Main.class.getResourceAsStream("/agent/voxpilot-agent.jar")) {
@@ -124,8 +145,7 @@ public final class Main {
         }
     }
 
-    private static void configureServer(Path project) throws IOException {
-        Path run = project.resolve("run");
+    private static void configureServer(Path run) throws IOException {
         Files.createDirectories(run);
         Files.writeString(run.resolve("eula.txt"), "eula=true\n", StandardCharsets.UTF_8);
         String properties = "online-mode=false\nserver-port=25565\nlevel-name=VoxPilotWorld\nlevel-type=minecraft:flat\n" +
@@ -134,6 +154,24 @@ public final class Main {
         UUID devUuid = UUID.nameUUIDFromBytes("OfflinePlayer:Dev".getBytes(StandardCharsets.UTF_8));
         String ops = "[{\"uuid\":\"" + devUuid + "\",\"name\":\"Dev\",\"level\":4,\"bypassesPlayerLimit\":true}]\n";
         Files.writeString(run.resolve("ops.json"), ops, StandardCharsets.UTF_8);
+    }
+
+    private static Path writeDedicatedServerInit(Path project) throws IOException {
+        Path script = project.resolve("run-server").resolve("voxpilot-server-run.init.gradle");
+        Files.createDirectories(script.getParent());
+        Files.writeString(
+                script,
+                """
+                allprojects { target ->
+                    target.afterEvaluate {
+                        target.minecraft.runs.named('server') {
+                            workingDirectory target.file('run-server')
+                        }
+                    }
+                }
+                """,
+                StandardCharsets.UTF_8);
+        return script;
     }
 
     private static void waitForText(Path file, String needle, int seconds) throws Exception {
@@ -211,5 +249,5 @@ public final class Main {
     private static Path requiredPath(String[] args, String key) { String value = option(args, key, null); if (value == null) throw new IllegalArgumentException("Missing " + key); return Path.of(value); }
     private static String option(String[] args, String key, String fallback) { for (int i=0;i<args.length-1;i++) if (key.equals(args[i])) return args[i+1]; return fallback; }
     private static boolean has(String[] args, String key) { for (String arg : args) if (key.equals(arg)) return true; return false; }
-    private static void usage() { System.out.println("VoxPilot 1.0\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
+    private static void usage() { System.out.println("VoxPilot 1.1\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
 }
