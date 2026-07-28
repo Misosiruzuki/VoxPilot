@@ -172,6 +172,9 @@ public final class ClientRuntime {
                     default -> CameraType.FIRST_PERSON;
                 });
             }
+            if (data.has("debugScreen")) {
+                mc.options.renderDebug = bool(data, "debugScreen", false);
+            }
             if (data.has("yaw")) mc.player.setYRot(data.get("yaw").getAsFloat());
             if (data.has("pitch")) mc.player.setXRot(data.get("pitch").getAsFloat());
             if (data.has("deltaYaw")) mc.player.setYRot(mc.player.getYRot() + data.get("deltaYaw").getAsFloat());

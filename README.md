@@ -1,4 +1,4 @@
-# VoxPilot 1.2
+# VoxPilot 1.2.1
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -67,7 +67,7 @@ Embeddiumなどを専用サーバーへ読み込ませず、実行中のmodsデ�
 [`THIRD-PARTY.md`](THIRD-PARTY.md)に記載しています。第三者ファイルはVoxPilot.jarへ同梱していません。
 
 配布用Modの難読化名は、対象MDKのForgeGradleを一時初期化スクリプトから呼び出して
-`run/voxpilot-cache/performance-remapped/`へ再マッピングします。対象の`build.gradle`は変更しません。
+一時出力から`.gradle/voxpilot-stable/performance-remapped/`へ退避します。対象の`build.gradle`は変更しません。
 BadOptimizations 2.4.1はこの開発用変換後に一部Mixinが不正なスタックフレームを生成するため除外しています。
 VoxPilotでは実測でエラーなく完走できた組み合わせだけを採用します。
 
@@ -86,7 +86,8 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 | `actions` | `frame`、または`fromFrame`～`toFrame`に適用する操作 |
 | `closeClient` | 完走時にMinecraftを閉じる |
 
-アクションでは `camera`（`first`、`third_back`、`third_front`）、`yaw`、`pitch`、`deltaYaw`、`deltaPitch`、および次のキーを指定できます。
+アクションでは `camera`（`first`、`third_back`、`third_front`）、F3表示を内部から切り替える
+`debugScreen`、`yaw`、`pitch`、`deltaYaw`、`deltaPitch`、および次のキーを指定できます。
 
 ```json
 {

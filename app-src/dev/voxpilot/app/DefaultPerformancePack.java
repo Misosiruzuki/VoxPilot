@@ -36,7 +36,7 @@ final class DefaultPerformancePack {
     }
 
     private static final String USER_AGENT =
-            "VoxPilot/1.2.0 (+https://github.com/Misosiruzuki/VoxPilot)";
+            "VoxPilot/1.2.1 (+https://github.com/Misosiruzuki/VoxPilot)";
     private static final String RESOURCE_PACK_FILENAME = "F8thful-v6.0.zip";
     private static final String RESOURCE_PACK_URL =
             "https://edge.forgecdn.net/files/4672/794/F8thful.zip";
@@ -112,6 +112,7 @@ final class DefaultPerformancePack {
     private final Path dedicatedServerRun;
     private final Path dedicatedServerMods;
     private final Path cache;
+    private final Path remapWorkCache;
     private final Path remappedCache;
     private final String javaHome;
     private final HttpClient http;
@@ -123,7 +124,11 @@ final class DefaultPerformancePack {
         this.dedicatedServerRun = project.resolve("run-server");
         this.dedicatedServerMods = dedicatedServerRun.resolve("mods");
         this.cache = run.resolve("voxpilot-cache").resolve("performance");
-        this.remappedCache = run.resolve("voxpilot-cache").resolve("performance-remapped");
+        this.remapWorkCache = project.resolve("build")
+                .resolve("voxpilot-remap-work");
+        this.remappedCache = project.resolve(".gradle")
+                .resolve("voxpilot-stable")
+                .resolve("performance-remapped");
         this.javaHome = javaHome;
         this.http = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -159,6 +164,8 @@ final class DefaultPerformancePack {
 
     void prepareClientSide(boolean dedicated) throws Exception {
         DefaultPerformanceConfig.applyClient(run);
+        ensureRemappedArtifacts();
+        Files.createDirectories(mods);
         if (dedicated) {
             installSides(mods, Side.COMMON, Side.CLIENT);
         } else {
@@ -232,8 +239,34 @@ final class DefaultPerformancePack {
                     "ForgeGradle failed to remap performance mods (exit "
                             + process.exitValue() + "); see " + log);
         }
+        copyRemapWorkToStableCache();
         for (Artifact artifact : ARTIFACTS) {
             findRemapped(artifact);
+        }
+    }
+
+    private void copyRemapWorkToStableCache() throws IOException {
+        Files.createDirectories(remappedCache);
+        try (var files = Files.list(remapWorkCache)) {
+            for (Path source : files.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".jar"))
+                    .toList()) {
+                Files.copy(
+                        source,
+                        remappedCache.resolve(source.getFileName()),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+    }
+
+    private void ensureRemappedArtifacts() throws Exception {
+        for (Artifact artifact : ARTIFACTS) {
+            try {
+                findRemapped(artifact);
+            } catch (IOException missing) {
+                remapArtifacts();
+                return;
+            }
         }
     }
 
@@ -253,7 +286,7 @@ final class DefaultPerformancePack {
                 allprojects { target ->
                     target.afterEvaluate {
                         def inputDir = target.file('run/voxpilot-cache/performance')
-                        def outputDir = target.file('run/voxpilot-cache/performance-remapped')
+                        def outputDir = target.file('build/voxpilot-remap-work')
                         def modules = [
                 %s
                         ]
