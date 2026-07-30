@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+
+- 各フレームへワールドの`gameTime`を記録し、描画FPSに左右されない`fromTick`／`toTick`アクションと`totalTicks`終了条件に対応
+- カスタム名`VoxPilotTrack`のエンティティの種類・座標・Yawを各フレームへ記録
+
 ## 1.2.1
 
 - JSONアクションへ`debugScreen`を追加し、OS入力やフォーカス移動なしでF3画面を検証可能に変更

@@ -1,4 +1,4 @@
-# VoxPilot 1.2.1
+# VoxPilot 1.2.2
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -78,7 +78,8 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 | フィールド | 内容 |
 |---|---|
 | `launchServer` | localhost専用の平坦ワールドサーバーも起動する |
-| `totalFrames` | 計測するレンダーフレーム数 |
+| `totalFrames` | 計測するレンダーフレーム数（各記録の`gameTime`で20 tick=1秒の実時間比較が可能） |
+| `totalTicks` | 指定時は計測開始からこのtick数でも終了（20 tick=1秒） |
 | `captureEvery` | NフレームごとにPNG保存。`1`なら全フレーム、`0`なら無効 |
 | `warmupFrames` | 接続と場面コマンド後、計測開始まで待つフレーム数 |
 | `display.background` | ウィンドウを `(-32000,-32000)` へ移して作業画面から外す |
@@ -86,7 +87,7 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 | `actions` | `frame`、または`fromFrame`～`toFrame`に適用する操作 |
 | `closeClient` | 完走時にMinecraftを閉じる |
 
-アクションでは `camera`（`first`、`third_back`、`third_front`）、F3表示を内部から切り替える
+アクションの期間は`fromFrame`～`toFrame`または`fromTick`～`toTick`で指定できます。tick指定は描画FPSに影響されません。アクションでは `camera`（`first`、`third_back`、`third_front`）、F3表示を内部から切り替える
 `debugScreen`、`yaw`、`pitch`、`deltaYaw`、`deltaPitch`、および次のキーを指定できます。
 
 ```json
@@ -109,6 +110,8 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 ```
 
 `commands` では、たとえば `tp Dev 0 -60 0`、`fill ...`、`summon ...`、`time set day` を使って実際のテスト場面を構築できます。VoxPilotが作るoffline localhostサーバー上の `Dev` だけにコマンド権限を付けます。外部サーバーへは接続しません。
+
+エンティティへカスタム名`VoxPilotTrack`を付けると、各フレームの`trackedEntities`へ種類・座標・Yawも記録されます（`CustomNameVisible:0b`で頭上表示は隠せます）。
 
 ## 作業を邪魔しない仕組み
 

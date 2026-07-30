@@ -10,6 +10,7 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -44,6 +45,7 @@ public final class ClientRuntime {
     private static JsonObject scenario;
     private static int frame;
     private static int totalFrames;
+    private static int totalTicks;
     private static int captureEvery;
     private static Path outputDir;
     private static boolean active;
@@ -52,6 +54,7 @@ public final class ClientRuntime {
     private static boolean commandsSent;
     private static boolean frameStarted;
     private static int warmupRemaining;
+    private static long scenarioStartGameTime;
 
     static {
         Thread listener = new Thread(ClientRuntime::listen, "VoxPilot-localhost-agent");
@@ -97,7 +100,12 @@ public final class ClientRuntime {
             String image = captured ? capture(mc, frame) : null;
             send(frameEvent(mc, image));
             frame++;
-            if (frame >= totalFrames) finish(mc);
+            long elapsedTicks =
+                    mc.level.getGameTime() - scenarioStartGameTime;
+            if (frame >= totalFrames
+                    || (totalTicks >= 0 && elapsedTicks >= totalTicks)) {
+                finish(mc);
+            }
         }
     }
 
@@ -106,9 +114,11 @@ public final class ClientRuntime {
         scenario = root;
         frame = 0;
         totalFrames = integer(root, "totalFrames", 120);
+        totalTicks = integer(root, "totalTicks", -1);
         captureEvery = integer(root, "captureEvery", 0);
         warmupRemaining = integer(root, "warmupFrames", 20);
         commandsSent = false;
+        scenarioStartGameTime = Long.MIN_VALUE;
         outputDir = Path.of(string(root, "outputDir", "voxpilot-output")).toAbsolutePath();
         ACTIONS.clear();
         JsonArray actions = root.has("actions") ? root.getAsJsonArray("actions") : new JsonArray();
@@ -155,9 +165,14 @@ public final class ClientRuntime {
     }
 
     private static void applyFrame(Minecraft mc) {
+        if (scenarioStartGameTime == Long.MIN_VALUE) {
+            scenarioStartGameTime = mc.level.getGameTime();
+        }
+        long elapsedTicks =
+                mc.level.getGameTime() - scenarioStartGameTime;
         releaseKeys(mc.options);
         for (Action action : ACTIONS) {
-            if (!action.contains(frame)) continue;
+            if (!action.contains(frame, elapsedTicks)) continue;
             JsonObject data = action.data;
             if (data.has("rawKey")) {
                 MinecraftForge.EVENT_BUS.post(new InputEvent.Key(
@@ -223,11 +238,33 @@ public final class ClientRuntime {
     private static JsonObject frameEvent(Minecraft mc, String image) {
         JsonObject item = event("frame");
         item.addProperty("frame", frame);
+        item.addProperty("gameTime", mc.level.getGameTime());
         item.addProperty("x", mc.player.getX()); item.addProperty("y", mc.player.getY()); item.addProperty("z", mc.player.getZ());
         item.addProperty("yaw", mc.player.getYRot()); item.addProperty("pitch", mc.player.getXRot());
         item.addProperty("vx", mc.player.getDeltaMovement().x); item.addProperty("vy", mc.player.getDeltaMovement().y); item.addProperty("vz", mc.player.getDeltaMovement().z);
         item.addProperty("onGround", mc.player.onGround()); item.addProperty("health", mc.player.getHealth());
         item.addProperty("camera", mc.options.getCameraType().name());
+        JsonArray tracked = new JsonArray();
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (!entity.hasCustomName()
+                    || !"VoxPilotTrack".equals(
+                            entity.getCustomName().getString())) {
+                continue;
+            }
+            JsonObject trackedEntity = new JsonObject();
+            trackedEntity.addProperty(
+                    "type",
+                    net.minecraft.core.registries.BuiltInRegistries
+                            .ENTITY_TYPE
+                            .getKey(entity.getType())
+                            .toString());
+            trackedEntity.addProperty("x", entity.getX());
+            trackedEntity.addProperty("y", entity.getY());
+            trackedEntity.addProperty("z", entity.getZ());
+            trackedEntity.addProperty("yaw", entity.getYRot());
+            tracked.add(trackedEntity);
+        }
+        item.add("trackedEntities", tracked);
         if (image != null) item.addProperty("screenshot", image);
         return item;
     }
@@ -249,8 +286,29 @@ public final class ClientRuntime {
         catch (IOException ignored) { }
     }
 
-    private record Action(int from, int to, JsonObject data) {
-        Action(JsonObject source) { this(integer(source, "fromFrame", integer(source, "frame", 0)), integer(source, "toFrame", integer(source, "frame", 0)), source); }
-        boolean contains(int value) { return value >= from && value <= to; }
+    private record Action(
+            int fromFrame,
+            int toFrame,
+            long fromTick,
+            long toTick,
+            boolean tickBased,
+            JsonObject data) {
+        Action(JsonObject source) {
+            this(
+                    integer(source, "fromFrame", integer(source, "frame", 0)),
+                    integer(source, "toFrame", integer(source, "frame", 0)),
+                    integer(source, "fromTick", integer(source, "tick", 0)),
+                    integer(source, "toTick", integer(source, "tick", 0)),
+                    source.has("fromTick")
+                            || source.has("toTick")
+                            || source.has("tick"),
+                    source);
+        }
+
+        boolean contains(int frameValue, long tickValue) {
+            return tickBased
+                    ? tickValue >= fromTick && tickValue <= toTick
+                    : frameValue >= fromFrame && frameValue <= toFrame;
+        }
     }
 }
