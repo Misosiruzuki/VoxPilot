@@ -10,7 +10,9 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -34,6 +36,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Mod.EventBusSubscriber(modid = VoxPilotAgent.MOD_ID, value = Dist.CLIENT)
@@ -41,6 +46,8 @@ public final class ClientRuntime {
     private static final Gson GSON = new Gson();
     private static final AtomicReference<JsonObject> PENDING = new AtomicReference<>();
     private static final List<Action> ACTIONS = new ArrayList<>();
+    private static final Set<Action> EXECUTED_ACTION_COMMANDS =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     private static volatile BufferedWriter output;
     private static JsonObject scenario;
     private static int frame;
@@ -121,6 +128,7 @@ public final class ClientRuntime {
         scenarioStartGameTime = Long.MIN_VALUE;
         outputDir = Path.of(string(root, "outputDir", "voxpilot-output")).toAbsolutePath();
         ACTIONS.clear();
+        EXECUTED_ACTION_COMMANDS.clear();
         JsonArray actions = root.has("actions") ? root.getAsJsonArray("actions") : new JsonArray();
         for (JsonElement item : actions) ACTIONS.add(new Action(item.getAsJsonObject()));
         mc.options.pauseOnLostFocus = false;
@@ -174,6 +182,10 @@ public final class ClientRuntime {
         for (Action action : ACTIONS) {
             if (!action.contains(frame, elapsedTicks)) continue;
             JsonObject data = action.data;
+            if (data.has("commands")
+                    && EXECUTED_ACTION_COMMANDS.add(action)) {
+                sendCommands(mc, data.getAsJsonArray("commands"));
+            }
             if (data.has("rawKey")) {
                 MinecraftForge.EVENT_BUS.post(new InputEvent.Key(
                         data.get("rawKey").getAsInt(), 0, GLFW.GLFW_PRESS, 0));
@@ -194,6 +206,33 @@ public final class ClientRuntime {
             if (data.has("pitch")) mc.player.setXRot(data.get("pitch").getAsFloat());
             if (data.has("deltaYaw")) mc.player.setYRot(mc.player.getYRot() + data.get("deltaYaw").getAsFloat());
             if (data.has("deltaPitch")) mc.player.setXRot(mc.player.getXRot() + data.get("deltaPitch").getAsFloat());
+        }
+    }
+
+    private static void sendCommands(Minecraft mc, JsonArray commands) {
+        MinecraftServer integratedServer = mc.getSingleplayerServer();
+        if (integratedServer != null) {
+            List<String> queued = new ArrayList<>();
+            for (JsonElement item : commands) {
+                String command = item.getAsString();
+                queued.add(command.startsWith("/")
+                        ? command.substring(1)
+                        : command);
+            }
+            integratedServer.execute(() -> {
+                for (String command : queued) {
+                    integratedServer.getCommands().performPrefixedCommand(
+                            integratedServer.createCommandSourceStack().withPermission(4),
+                            command);
+                }
+            });
+            return;
+        }
+        for (JsonElement item : commands) {
+            String command = item.getAsString();
+            mc.player.connection.sendCommand(command.startsWith("/")
+                    ? command.substring(1)
+                    : command);
         }
     }
 
@@ -262,9 +301,42 @@ public final class ClientRuntime {
             trackedEntity.addProperty("y", entity.getY());
             trackedEntity.addProperty("z", entity.getZ());
             trackedEntity.addProperty("yaw", entity.getYRot());
+            if (entity instanceof LivingEntity living) {
+                trackedEntity.addProperty("health", living.getHealth());
+                trackedEntity.addProperty("hurtTime", living.hurtTime);
+                trackedEntity.addProperty("swinging", living.swinging);
+                trackedEntity.addProperty("swingTime", living.swingTime);
+                trackedEntity.addProperty(
+                        "swingingArm",
+                        living.swingingArm == null
+                                ? "NONE"
+                                : living.swingingArm.name());
+            }
             tracked.add(trackedEntity);
         }
         item.add("trackedEntities", tracked);
+        JsonArray trackedBlocks = new JsonArray();
+        if (scenario.has("trackedBlocks")) {
+            for (JsonElement element : scenario.getAsJsonArray("trackedBlocks")) {
+                JsonObject source = element.getAsJsonObject();
+                BlockPos pos = new BlockPos(
+                        source.get("x").getAsInt(),
+                        source.get("y").getAsInt(),
+                        source.get("z").getAsInt());
+                JsonObject trackedBlock = new JsonObject();
+                trackedBlock.addProperty(
+                        "label",
+                        string(source, "label", pos.toShortString()));
+                trackedBlock.addProperty("x", pos.getX());
+                trackedBlock.addProperty("y", pos.getY());
+                trackedBlock.addProperty("z", pos.getZ());
+                trackedBlock.addProperty(
+                        "state",
+                        mc.level.getBlockState(pos).toString());
+                trackedBlocks.add(trackedBlock);
+            }
+        }
+        item.add("trackedBlocks", trackedBlocks);
         if (image != null) item.addProperty("screenshot", image);
         return item;
     }

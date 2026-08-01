@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.3
+
+- Added per-frame `trackedBlocks` block-state telemetry for crop age and similar stateful tests.
+
+- tick/frameアクションの初回にMinecraftコマンドを実行できる`commands`を追加。
+- 追跡LivingEntityへ体力、被弾時間、腕振り状態・時間・腕を記録。
+
 ## 1.2.2
 
 - 各フレームへワールドの`gameTime`を記録し、描画FPSに左右されない`fromTick`／`toTick`アクションと`totalTicks`終了条件に対応

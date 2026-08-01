@@ -36,7 +36,7 @@ final class DefaultPerformancePack {
     }
 
     private static final String USER_AGENT =
-            "VoxPilot/1.2.2 (+https://github.com/Misosiruzuki/VoxPilot)";
+            "VoxPilot/1.2.3 (+https://github.com/Misosiruzuki/VoxPilot)";
     private static final String RESOURCE_PACK_FILENAME = "F8thful-v6.0.zip";
     private static final String RESOURCE_PACK_URL =
             "https://edge.forgecdn.net/files/4672/794/F8thful.zip";

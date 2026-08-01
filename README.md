@@ -1,4 +1,4 @@
-# VoxPilot 1.2.2
+# VoxPilot 1.2.3
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -87,7 +87,11 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 | `actions` | `frame`、または`fromFrame`～`toFrame`に適用する操作 |
 | `closeClient` | 完走時にMinecraftを閉じる |
 
-アクションの期間は`fromFrame`～`toFrame`または`fromTick`～`toTick`で指定できます。tick指定は描画FPSに影響されません。アクションでは `camera`（`first`、`third_back`、`third_front`）、F3表示を内部から切り替える
+アクションの期間は`fromFrame`～`toFrame`または`fromTick`～`toTick`で指定できます。tick指定は描画FPSに影響されません。アクションでは `camera`（`first`、`third_back`、`third_front`）、F3表示、キー入力に加え、`commands`をそのアクションの初回だけ実行できます。
+
+`CustomName` が `VoxPilotTrack` のLivingEntityは、位置・yaw・health・hurtTime・swinging・swingTime・swingingArmをフレームごとに記録します。
+
+シナリオ直下の `trackedBlocks` に `label`、`x`、`y`、`z` を指定すると、各フレームの `trackedBlocks` に完全なブロックステートが記録されます。作物の `age` など、見た目だけでは判定しにくい状態確認に利用できます。
 `debugScreen`、`yaw`、`pitch`、`deltaYaw`、`deltaPitch`、および次のキーを指定できます。
 
 ```json
