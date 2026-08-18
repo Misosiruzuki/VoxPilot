@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.2.6
+
+### Added
+- Scenario actions: `hotbar`, `containerClick` (pickup/quick_move), `closeScreen`
+- Frame telemetry: `screen`, `hasContainerScreen`, `mainHand`, `carried`, `hotbarSelected`
+
+
+
 ## 1.2.5
 
 ### Fixed

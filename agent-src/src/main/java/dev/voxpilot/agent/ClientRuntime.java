@@ -10,9 +10,13 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -47,6 +51,10 @@ public final class ClientRuntime {
     private static final AtomicReference<JsonObject> PENDING = new AtomicReference<>();
     private static final List<Action> ACTIONS = new ArrayList<>();
     private static final Set<Action> EXECUTED_ACTION_COMMANDS =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<Action> EXECUTED_CONTAINER_CLICKS =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<Action> EXECUTED_CLOSE_SCREEN =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static volatile BufferedWriter output;
     private static JsonObject scenario;
@@ -129,6 +137,8 @@ public final class ClientRuntime {
         outputDir = Path.of(string(root, "outputDir", "voxpilot-output")).toAbsolutePath();
         ACTIONS.clear();
         EXECUTED_ACTION_COMMANDS.clear();
+        EXECUTED_CONTAINER_CLICKS.clear();
+        EXECUTED_CLOSE_SCREEN.clear();
         JsonArray actions = root.has("actions") ? root.getAsJsonArray("actions") : new JsonArray();
         for (JsonElement item : actions) ACTIONS.add(new Action(item.getAsJsonObject()));
         mc.options.pauseOnLostFocus = false;
@@ -206,7 +216,61 @@ public final class ClientRuntime {
             if (data.has("pitch")) mc.player.setXRot(data.get("pitch").getAsFloat());
             if (data.has("deltaYaw")) mc.player.setYRot(mc.player.getYRot() + data.get("deltaYaw").getAsFloat());
             if (data.has("deltaPitch")) mc.player.setXRot(mc.player.getXRot() + data.get("deltaPitch").getAsFloat());
+            if (data.has("hotbar")) {
+                int slot = data.get("hotbar").getAsInt();
+                if (slot >= 0 && slot <= 8) {
+                    mc.player.getInventory().selected = slot;
+                }
+            }
+            if (data.has("containerClick") && EXECUTED_CONTAINER_CLICKS.add(action)) {
+                applyContainerClick(mc, data.get("containerClick").getAsJsonObject());
+            }
+            if (data.has("closeScreen") && bool(data, "closeScreen", false)
+                    && EXECUTED_CLOSE_SCREEN.add(action)) {
+                mc.player.closeContainer();
+            }
         }
+    }
+
+    /**
+     * Click a slot in the currently open container menu (Nexus GUI, crafting table, etc.).
+     * JSON: { "slot": 29, "button": 0, "type": "quick_move"|"pickup"|"throw" }
+     * NexusMenu: 0=input, 1=output, 2-28=main inv, 29-37=hotbar.
+     * CraftingMenu: 0=result, 1-9=grid, then player inv/hotbar.
+     */
+    private static void applyContainerClick(Minecraft mc, JsonObject click) {
+        if (mc.player == null || mc.gameMode == null) {
+            send(error("containerClick", new IllegalStateException("no player/gameMode")));
+            return;
+        }
+        if (!(mc.screen instanceof AbstractContainerScreen<?>)) {
+            send(error("containerClick", new IllegalStateException(
+                    "no container screen open (screen="
+                            + (mc.screen == null ? "null" : mc.screen.getClass().getName())
+                            + ")")));
+            return;
+        }
+        int slot = integer(click, "slot", 0);
+        int button = integer(click, "button", 0);
+        String typeName = string(click, "type", "pickup").toLowerCase(Locale.ROOT);
+        ClickType type = switch (typeName) {
+            case "quick_move", "shift", "quickmove" -> ClickType.QUICK_MOVE;
+            case "throw" -> ClickType.THROW;
+            case "clone" -> ClickType.CLONE;
+            case "swap" -> ClickType.SWAP;
+            default -> ClickType.PICKUP;
+        };
+        int containerId = mc.player.containerMenu.containerId;
+        mc.gameMode.handleInventoryMouseClick(containerId, slot, button, type, mc.player);
+        JsonObject note = event("container_click");
+        note.addProperty("slot", slot);
+        note.addProperty("button", button);
+        note.addProperty("clickType", type.name());
+        note.addProperty("containerId", containerId);
+        note.addProperty(
+                "screen",
+                mc.screen == null ? "null" : mc.screen.getClass().getName());
+        send(note);
     }
 
     private static void sendCommands(Minecraft mc, JsonArray commands) {
@@ -337,6 +401,20 @@ public final class ClientRuntime {
             }
         }
         item.add("trackedBlocks", trackedBlocks);
+        Screen screen = mc.screen;
+        item.addProperty("screen", screen == null ? "" : screen.getClass().getName());
+        item.addProperty("hasContainerScreen", screen instanceof AbstractContainerScreen<?>);
+        if (mc.player != null) {
+            item.addProperty("hotbarSelected", mc.player.getInventory().selected);
+            ItemStack carried = mc.player.containerMenu.getCarried();
+            item.addProperty(
+                    "carried",
+                    carried.isEmpty() ? "" : carried.getItem().toString());
+            ItemStack main = mc.player.getMainHandItem();
+            item.addProperty(
+                    "mainHand",
+                    main.isEmpty() ? "" : main.getItem().toString());
+        }
         if (image != null) item.addProperty("screenshot", image);
         return item;
     }
