@@ -247,7 +247,7 @@ public final class Main {
         }
     }
 
-    private static Process launch(    private static Process launch(Path project, String javaHome, Path log, String... gradleArgs) throws IOException {
+    private static Process launch(Path project, String javaHome, Path log, String... gradleArgs) throws IOException {
         List<String> command = new ArrayList<>();
         command.add("cmd.exe"); command.add("/d"); command.add("/c"); command.add("gradlew.bat"); command.add("--no-daemon");
         for (String arg : gradleArgs) command.add(arg);
