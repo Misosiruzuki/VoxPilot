@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.9
+
+### Fixed
+- Apply camera/yaw/pitch before `keys.use` / `containerClick`, and re-run `gameRenderer.pick` so block GUI opens on the looked-at block
+
+
+
 ## 1.2.8
 
 ### Fixed

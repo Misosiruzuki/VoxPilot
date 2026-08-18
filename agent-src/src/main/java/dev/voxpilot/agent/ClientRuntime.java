@@ -246,12 +246,7 @@ public final class ClientRuntime {
                 MinecraftForge.EVENT_BUS.post(new InputEvent.Key(
                         data.get("rawKey").getAsInt(), 0, GLFW.GLFW_PRESS, 0));
             }
-            if (data.has("keys")) applyKeys(mc.options, data.getAsJsonObject("keys"));
-            if (data.has("keys")
-                    && bool(data.getAsJsonObject("keys"), "use", false)
-                    && EXECUTED_USE_INTERACT.add(action)) {
-                forceUseOnCrosshair(mc);
-            }
+            // Camera / look first so use + container clicks hit the intended block/slot
             if (data.has("camera")) {
                 String camera = data.get("camera").getAsString().toLowerCase(Locale.ROOT);
                 mc.options.setCameraType(switch (camera) {
@@ -272,6 +267,14 @@ public final class ClientRuntime {
                 if (slot >= 0 && slot <= 8) {
                     mc.player.getInventory().selected = slot;
                 }
+            }
+            if (data.has("keys")) applyKeys(mc.options, data.getAsJsonObject("keys"));
+            if (data.has("keys")
+                    && bool(data.getAsJsonObject("keys"), "use", false)
+                    && EXECUTED_USE_INTERACT.add(action)) {
+                // Re-pick crosshair after look was applied this tick
+                mc.gameRenderer.pick(1.0F);
+                forceUseOnCrosshair(mc);
             }
             if (data.has("containerClick") && EXECUTED_CONTAINER_CLICKS.add(action)) {
                 applyContainerClick(mc, data.get("containerClick").getAsJsonObject());
