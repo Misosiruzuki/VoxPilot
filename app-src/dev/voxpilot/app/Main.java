@@ -417,5 +417,5 @@ public final class Main {
     private static Path requiredPath(String[] args, String key) { String value = option(args, key, null); if (value == null) throw new IllegalArgumentException("Missing " + key); return Path.of(value); }
     private static String option(String[] args, String key, String fallback) { for (int i=0;i<args.length-1;i++) if (key.equals(args[i])) return args[i+1]; return fallback; }
     private static boolean has(String[] args, String key) { for (String arg : args) if (key.equals(arg)) return true; return false; }
-    private static void usage() { System.out.println("VoxPilot 1.2.7\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
+    private static void usage() { System.out.println("VoxPilot 1.2.8\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
 }

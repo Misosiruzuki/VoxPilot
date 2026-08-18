@@ -16,7 +16,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -55,6 +58,8 @@ public final class ClientRuntime {
     private static final Set<Action> EXECUTED_CONTAINER_CLICKS =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<Action> EXECUTED_CLOSE_SCREEN =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<Action> EXECUTED_USE_INTERACT =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static volatile BufferedWriter output;
     private static JsonObject scenario;
@@ -179,6 +184,7 @@ public final class ClientRuntime {
         EXECUTED_ACTION_COMMANDS.clear();
         EXECUTED_CONTAINER_CLICKS.clear();
         EXECUTED_CLOSE_SCREEN.clear();
+        EXECUTED_USE_INTERACT.clear();
         JsonArray actions = root.has("actions") ? root.getAsJsonArray("actions") : new JsonArray();
         for (JsonElement item : actions) ACTIONS.add(new Action(item.getAsJsonObject()));
         mc.options.pauseOnLostFocus = false;
@@ -241,6 +247,11 @@ public final class ClientRuntime {
                         data.get("rawKey").getAsInt(), 0, GLFW.GLFW_PRESS, 0));
             }
             if (data.has("keys")) applyKeys(mc.options, data.getAsJsonObject("keys"));
+            if (data.has("keys")
+                    && bool(data.getAsJsonObject("keys"), "use", false)
+                    && EXECUTED_USE_INTERACT.add(action)) {
+                forceUseOnCrosshair(mc);
+            }
             if (data.has("camera")) {
                 String camera = data.get("camera").getAsString().toLowerCase(Locale.ROOT);
                 mc.options.setCameraType(switch (camera) {

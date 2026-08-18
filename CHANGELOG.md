@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.8
+
+### Fixed
+- When an action sets `keys.use`, also call `gameMode.useItemOn` once on the crosshair block so container GUIs open reliably in automation
+
+
+
 ## 1.2.7
 
 ### Fixed
