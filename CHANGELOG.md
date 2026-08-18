@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.5
+
+### Fixed
+- Embed **dev** (official-mapped) agent jar so MDK `runClient` no longer crashes with `NoSuchMethodError Minecraft.m_91087_()`.
+
+
+
 ## 1.2.4
 
 ### Changed

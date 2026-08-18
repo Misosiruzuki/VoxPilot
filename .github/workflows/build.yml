@@ -28,7 +28,7 @@ jobs:
 
       - name: Build VoxPilot.jar
         env:
-          VOXPILOT_VERSION: "1.2.4-ci.${{ github.run_number }}"
+          VOXPILOT_VERSION: "1.2.5-ci.${{ github.run_number }}"
         run: |
           chmod +x scripts/build-jar.sh agent-src/gradlew
           ./scripts/build-jar.sh
