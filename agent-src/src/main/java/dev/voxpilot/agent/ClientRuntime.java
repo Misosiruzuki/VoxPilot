@@ -283,6 +283,34 @@ public final class ClientRuntime {
         }
     }
 
+
+    /** Prefer explicit use-on-block so GUI opens even when key-mapping alone is flaky. */
+    private static void forceUseOnCrosshair(Minecraft mc) {
+        if (mc.player == null || mc.gameMode == null || mc.level == null) {
+            return;
+        }
+        HitResult hit = mc.hitResult;
+        if (hit == null || hit.getType() != HitResult.Type.BLOCK) {
+            JsonObject err = event("error");
+            err.addProperty("where", "useInteract");
+            err.addProperty(
+                    "message",
+                    "use requested but crosshair is not on a block (hit="
+                            + (hit == null ? "null" : String.valueOf(hit.getType()))
+                            + ")");
+            send(err);
+            return;
+        }
+        BlockHitResult blockHit = (BlockHitResult) hit;
+        mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, blockHit);
+        JsonObject note = event("use_interact");
+        note.addProperty("pos", blockHit.getBlockPos().toShortString());
+        note.addProperty(
+                "block",
+                mc.level.getBlockState(blockHit.getBlockPos()).toString());
+        send(note);
+    }
+
     /**
      * Click a slot in the currently open container menu (Nexus GUI, crafting table, etc.).
      * JSON: { "slot": 29, "button": 0, "type": "quick_move"|"pickup"|"throw" }
