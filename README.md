@@ -157,3 +157,25 @@ VoxPilotはWindowsの `SendInput` やマウス移動を使いません。localho
 VoxPilotは対象MDKの `run/mods/voxpilot-agent-1.0.0.jar`、既定軽量化Mod、
 `run/resourcepacks/F8thful-v6.0.zip`、`run/eula.txt`、`run/server.properties`、`run/ops.json`、
 テストワールドとレポートを作成します。Modの `src/` や `build.gradle` は変更しません。
+
+
+## ビルド（開発者向け）
+
+JDK 17 が必要です。
+
+```bash
+chmod +x scripts/build-jar.sh agent-src/gradlew
+./scripts/build-jar.sh
+```
+
+成果物: リポジトリ直下および `build/dist/VoxPilot.jar`。
+
+### GitHub Actions
+
+- `Build` … `main` への push / PR で jar をビルドし Artifact にアップロード
+- `Release` … タグ `v*` の push、または workflow_dispatch で GitHub Release を作成し `VoxPilot.jar` を添付
+
+```bash
+git tag v1.2.4
+git push origin v1.2.4
+```

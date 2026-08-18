@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.2.4
+
+### Changed
+- 長時間シナリオ対応（クライアント終了待ちをシナリオ長から算出、最大2時間）
+- ソケット読み取りタイムアウト 60分、デフォルト totalFrames 600
+- GitHub Actions でビルド／Release 自動化（`scripts/build-jar.sh`）
+
+
 ### Changed
 - 長時間シナリオ対応: クライアント終了待ちをシナリオの `totalTicks`/`totalFrames` から算出（最大2時間）。ソケット読み取りタイムアウトを60分に延長。デフォルト `totalFrames` を 600 に変更。
 
