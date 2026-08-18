@@ -70,27 +70,55 @@ public final class Main {
             } else {
                 quickPlay = "--width 854 --height 480";
             }
-            client = launch(project, javaHome, reportDir.resolve("client.log"), "runClient", "--args=" + quickPlay);
-            runScenario(scenario, reportDir.resolve("frames.jsonl"));
+            Path clientLog = reportDir.resolve("client.log");
+            client = launch(project, javaHome, clientLog, "runClient", "--args=" + quickPlay);
+            runScenario(scenario, reportDir.resolve("frames.jsonl"), client, clientLog);
             waitForExit(client, clientExitSeconds(sourceScenario));
             writeHtml(reportDir);
             System.out.println("VOXPILOT_SUCCESS=" + reportDir);
+        } catch (Exception failed) {
+            System.err.println("VOXPILOT_FAILED=" + failed.getMessage());
+            try {
+                writeHtml(reportDir);
+            } catch (Exception ignored) {
+            }
+            throw failed;
         } finally {
             terminateTree(client);
             terminateTree(server);
         }
     }
 
-    private static void runScenario(String scenario, Path framesLog) throws Exception {
-        long deadline = System.nanoTime() + 240_000_000_000L;
+    private static void runScenario(String scenario, Path framesLog, Process client, Path clientLog) throws Exception {
+        long agentDeadline = System.nanoTime() + 120_000_000_000L; // 2 minutes to reach agent
         Socket socket = new Socket();
         while (true) {
+            if (client != null && !client.isAlive()) {
+                String hint = tailHint(clientLog);
+                throw new IOException(
+                        "Client process exited before VoxPilot agent became ready. "
+                                + "Likely client crash or multiplayer connection failure. "
+                                + hint);
+            }
+            String connectFail = findConnectionFailure(clientLog);
+            if (connectFail != null) {
+                throw new IOException("Client failed to connect to server: " + connectFail);
+            }
             try {
                 socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), AGENT_PORT), 1000);
                 break;
             } catch (IOException notReady) {
-                socket.close();
-                if (System.nanoTime() > deadline) throw new IOException("VoxPilot agent did not open port " + AGENT_PORT, notReady);
+                try {
+                    socket.close();
+                } catch (IOException ignored) {
+                }
+                if (System.nanoTime() > agentDeadline) {
+                    throw new IOException(
+                            "VoxPilot agent did not open port " + AGENT_PORT
+                                    + " within 120s (client may have failed to reach the world). "
+                                    + tailHint(clientLog),
+                            notReady);
+                }
                 Thread.sleep(500L);
                 socket = new Socket();
             }
@@ -100,20 +128,126 @@ public final class Main {
              BufferedReader in = new BufferedReader(new InputStreamReader(connectedSocket.getInputStream(), StandardCharsets.UTF_8));
              BufferedWriter out = new BufferedWriter(new OutputStreamWriter(connectedSocket.getOutputStream(), StandardCharsets.UTF_8));
              BufferedWriter frames = Files.newBufferedWriter(framesLog, StandardCharsets.UTF_8)) {
-            connectedSocket.setSoTimeout(3_600_000);
+            // Fail faster than full scenario length if agent stops talking after a hang
+            connectedSocket.setSoTimeout(180_000);
             String ready = in.readLine();
-            if (ready == null || !ready.contains("agent_ready")) throw new IOException("Invalid agent greeting: " + ready);
-            out.write(scenario.replace("\r", "").replace("\n", "")); out.newLine(); out.flush();
-            for (String line; (line = in.readLine()) != null;) {
-                frames.write(line); frames.newLine(); frames.flush();
-                if (line.contains("\"type\":\"error\"")) System.err.println(line);
-                if (line.contains("\"type\":\"complete\"")) return;
+            if (ready == null || !ready.contains("agent_ready")) {
+                throw new IOException("Invalid agent greeting: " + ready);
             }
-            throw new EOFException("Agent disconnected before completion");
+            out.write(scenario.replace("\r", "").replace("\n", ""));
+            out.newLine();
+            out.flush();
+            long lastLineNanos = System.nanoTime();
+            boolean sawFrame = false;
+            for (;;) {
+                if (client != null && !client.isAlive()) {
+                    throw new IOException(
+                            "Client process exited before scenario completion. "
+                                    + tailHint(clientLog));
+                }
+                String connectFail = findConnectionFailure(clientLog);
+                if (connectFail != null && !sawFrame) {
+                    throw new IOException("Client failed to connect to server: " + connectFail);
+                }
+                try {
+                    String line = in.readLine();
+                    if (line == null) {
+                        throw new EOFException(
+                                "Agent disconnected before completion. " + tailHint(clientLog));
+                    }
+                    lastLineNanos = System.nanoTime();
+                    frames.write(line);
+                    frames.newLine();
+                    frames.flush();
+                    if (line.contains("\"type\":\"error\"")) {
+                        System.err.println(line);
+                        if (line.contains("connection_failed")
+                                || line.contains("world_timeout")
+                                || line.contains("No player/level")) {
+                            throw new IOException("Scenario aborted by agent: " + line);
+                        }
+                    }
+                    if (line.contains("\"type\":\"frame\"")) {
+                        sawFrame = true;
+                    }
+                    if (line.contains("\"type\":\"complete\"")) {
+                        return;
+                    }
+                } catch (java.net.SocketTimeoutException timeout) {
+                    if (!sawFrame) {
+                        throw new IOException(
+                                "Timed out waiting for first scenario frame (client likely never joined the world). "
+                                        + tailHint(clientLog),
+                                timeout);
+                    }
+                    // After frames started, allow longer gaps up to 3 minutes of silence
+                    if (System.nanoTime() - lastLineNanos > 180_000_000_000L) {
+                        throw new IOException(
+                                "Agent stopped sending frames for 180s. " + tailHint(clientLog),
+                                timeout);
+                    }
+                }
+            }
         }
     }
 
-    private static Process launch(Path project, String javaHome, Path log, String... gradleArgs) throws IOException {
+    /** Scan client.log for multiplayer / socket connection failures. */
+    private static String findConnectionFailure(Path clientLog) {
+        if (clientLog == null || !Files.isRegularFile(clientLog)) {
+            return null;
+        }
+        try {
+            String text = Files.readString(clientLog, StandardCharsets.UTF_8);
+            String[] needles = {
+                    "Connection refused",
+                    "Failed to connect to server",
+                    "Cannot connect to server",
+                    "java.net.ConnectException",
+                    "io.netty.channel.AbstractChannel$AnnotatedConnectException",
+                    "Disconnected",
+                    "Connection timed out",
+                    "Failed to login",
+                    "Invalid player data",
+                    "multiplayer.disconnect",
+                    "Lost connection",
+                    "Dev lost connection"
+            };
+            for (String needle : needles) {
+                int idx = text.lastIndexOf(needle);
+                if (idx >= 0) {
+                    int lineStart = text.lastIndexOf('\n', idx);
+                    int lineEnd = text.indexOf('\n', idx);
+                    if (lineStart < 0) lineStart = 0;
+                    if (lineEnd < 0) lineEnd = Math.min(text.length(), idx + 200);
+                    return text.substring(lineStart, lineEnd).trim();
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return null;
+    }
+
+    private static String tailHint(Path log) {
+        if (log == null || !Files.isRegularFile(log)) {
+            return "(no client.log yet)";
+        }
+        try {
+            List<String> lines = Files.readAllLines(log, StandardCharsets.UTF_8);
+            int from = Math.max(0, lines.size() - 8);
+            StringBuilder sb = new StringBuilder("client.log tail: ");
+            for (int i = from; i < lines.size(); i++) {
+                if (i > from) sb.append(" | ");
+                String line = lines.get(i);
+                if (line.length() > 160) line = line.substring(0, 160) + "...";
+                sb.append(line);
+            }
+            return sb.toString();
+        } catch (IOException e) {
+            return "(could not read client.log)";
+        }
+    }
+
+    private static Process launch(    private static Process launch(Path project, String javaHome, Path log, String... gradleArgs) throws IOException {
         List<String> command = new ArrayList<>();
         command.add("cmd.exe"); command.add("/d"); command.add("/c"); command.add("gradlew.bat"); command.add("--no-daemon");
         for (String arg : gradleArgs) command.add(arg);
@@ -283,5 +417,5 @@ public final class Main {
     private static Path requiredPath(String[] args, String key) { String value = option(args, key, null); if (value == null) throw new IllegalArgumentException("Missing " + key); return Path.of(value); }
     private static String option(String[] args, String key, String fallback) { for (int i=0;i<args.length-1;i++) if (key.equals(args[i])) return args[i+1]; return fallback; }
     private static boolean has(String[] args, String key) { for (String arg : args) if (key.equals(arg)) return true; return false; }
-    private static void usage() { System.out.println("VoxPilot 1.2.6\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
+    private static void usage() { System.out.println("VoxPilot 1.2.7\njava -jar VoxPilot.jar run --project <Forge MDK> --scenario <scenario.json> [--java-home <JDK17>]\njava -jar VoxPilot.jar report --dir <report directory>"); }
 }

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.2.7
+
+### Fixed
+- Fail fast when the client never reaches a world / multiplayer server (90s agent-side timeout, connection-error log scan, client process death detection)
+- Clearer `VOXPILOT_FAILED=...` messages with `client.log` tail instead of waiting until long scenario timeout
+
+
+
 ## 1.2.6
 
 ### Added

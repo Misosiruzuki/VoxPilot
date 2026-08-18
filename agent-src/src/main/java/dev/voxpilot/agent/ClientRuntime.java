@@ -70,6 +70,10 @@ public final class ClientRuntime {
     private static boolean frameStarted;
     private static int warmupRemaining;
     private static long scenarioStartGameTime;
+    /** When scenario became active while player/level still null (nanoTime). */
+    private static long waitingForWorldSinceNanos;
+    private static long lastWorldWaitHeartbeatNanos;
+
 
     static {
         Thread listener = new Thread(ClientRuntime::listen, "VoxPilot-localhost-agent");
@@ -103,7 +107,42 @@ public final class ClientRuntime {
             JsonObject incoming = PENDING.getAndSet(null);
             if (incoming != null) begin(incoming, mc);
             if (!active) return;
-            if (mc.player == null || mc.level == null) return;
+            if (mc.player == null || mc.level == null) {
+                if (waitingForWorldSinceNanos == 0L) {
+                    waitingForWorldSinceNanos = System.nanoTime();
+                }
+                long now = System.nanoTime();
+                long waited = now - waitingForWorldSinceNanos;
+                // Heartbeat every ~5s so the app socket read does not idle-timeout
+                if (now - lastWorldWaitHeartbeatNanos > 5_000_000_000L) {
+                    lastWorldWaitHeartbeatNanos = now;
+                    JsonObject wait = event("waiting_for_world");
+                    wait.addProperty("waitedMs", waited / 1_000_000L);
+                    wait.addProperty(
+                            "screen",
+                            mc.screen == null ? "" : mc.screen.getClass().getName());
+                    send(wait);
+                }
+                // Fail fast: no player/level after 90s → connection or join failure
+                if (waited > 90_000_000_000L) {
+                    JsonObject err = event("error");
+                    err.addProperty("where", "connection_failed");
+                    err.addProperty(
+                            "message",
+                            "No player/level after 90s — multiplayer join or world load failed"
+                                    + " (screen="
+                                    + (mc.screen == null ? "null" : mc.screen.getClass().getName())
+                                    + ")");
+                    send(err);
+                    active = false;
+                    send(event("complete"));
+                    if (bool(scenario, "closeClient", true)) {
+                        mc.stop();
+                    }
+                }
+                return;
+            }
+            waitingForWorldSinceNanos = 0L;
             if (!windowPositioned) configureWindow(mc);
             if (!commandsSent) sendSceneCommands(mc);
             if (warmupRemaining-- > 0) return;
@@ -127,6 +166,7 @@ public final class ClientRuntime {
     private static void begin(JsonObject root, Minecraft mc) {
         scenarioStarted = true;
         scenario = root;
+        waitingForWorldSinceNanos = 0L;
         frame = 0;
         totalFrames = integer(root, "totalFrames", 600);
         totalTicks = integer(root, "totalTicks", -1);
