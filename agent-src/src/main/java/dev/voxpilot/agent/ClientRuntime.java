@@ -120,7 +120,7 @@ public final class ClientRuntime {
         scenarioStarted = true;
         scenario = root;
         frame = 0;
-        totalFrames = integer(root, "totalFrames", 120);
+        totalFrames = integer(root, "totalFrames", 600);
         totalTicks = integer(root, "totalTicks", -1);
         captureEvery = integer(root, "captureEvery", 0);
         warmupRemaining = integer(root, "warmupFrames", 20);

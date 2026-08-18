@@ -1,4 +1,4 @@
-# VoxPilot 1.2.3
+# VoxPilot 1.2.4
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -80,6 +80,7 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 | `launchServer` | localhost専用の平坦ワールドサーバーも起動する |
 | `totalFrames` | 計測するレンダーフレーム数（各記録の`gameTime`で20 tick=1秒の実時間比較が可能） |
 | `totalTicks` | 指定時は計測開始からこのtick数でも終了（20 tick=1秒） |
+| （長時間） | ハード上限は「短時間専用」ではない。`totalTicks`/`totalFrames` を大きくすれば実プレイ相当の長時間計測が可能。アプリ側はシナリオ長さに応じて最大約2時間までクライアント終了を待機する |
 | `captureEvery` | NフレームごとにPNG保存。`1`なら全フレーム、`0`なら無効 |
 | `warmupFrames` | 接続と場面コマンド後、計測開始まで待つフレーム数 |
 | `display.background` | ウィンドウを `(-32000,-32000)` へ移して作業画面から外す |

@@ -72,7 +72,7 @@ public final class Main {
             }
             client = launch(project, javaHome, reportDir.resolve("client.log"), "runClient", "--args=" + quickPlay);
             runScenario(scenario, reportDir.resolve("frames.jsonl"));
-            waitForExit(client, 60);
+            waitForExit(client, clientExitSeconds(sourceScenario));
             writeHtml(reportDir);
             System.out.println("VOXPILOT_SUCCESS=" + reportDir);
         } finally {
@@ -100,7 +100,7 @@ public final class Main {
              BufferedReader in = new BufferedReader(new InputStreamReader(connectedSocket.getInputStream(), StandardCharsets.UTF_8));
              BufferedWriter out = new BufferedWriter(new OutputStreamWriter(connectedSocket.getOutputStream(), StandardCharsets.UTF_8));
              BufferedWriter frames = Files.newBufferedWriter(framesLog, StandardCharsets.UTF_8)) {
-            connectedSocket.setSoTimeout(900_000);
+            connectedSocket.setSoTimeout(3_600_000);
             String ready = in.readLine();
             if (ready == null || !ready.contains("agent_ready")) throw new IOException("Invalid agent greeting: " + ready);
             out.write(scenario.replace("\r", "").replace("\n", "")); out.newLine(); out.flush();
@@ -181,6 +181,40 @@ public final class Main {
             Thread.sleep(500L);
         }
         throw new IOException("Timed out waiting for '" + needle + "' in " + file);
+    }
+
+
+    /** Scale client exit wait from scenario length (play-faithful long runs). */
+    private static int clientExitSeconds(String text) {
+        int fallback = 1800;
+        try {
+            int totalTicks = readJsonInt(text, "totalTicks", -1);
+            int totalFrames = readJsonInt(text, "totalFrames", 600);
+            int fromTicks = totalTicks > 0 ? totalTicks / 20 + 120 : 0;
+            int fromFrames = totalFrames / 5 + 120;
+            int sec = Math.max(fromTicks, fromFrames);
+            return Math.min(Math.max(sec, 180), 7200);
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private static int readJsonInt(String json, String key, int defaultValue) {
+        String needle = "\"" + key + "\"";
+        int i = json.indexOf(needle);
+        if (i < 0) return defaultValue;
+        int colon = json.indexOf(':', i + needle.length());
+        if (colon < 0) return defaultValue;
+        int j = colon + 1;
+        while (j < json.length() && Character.isWhitespace(json.charAt(j))) j++;
+        int k = j;
+        while (k < json.length() && (Character.isDigit(json.charAt(k)) || json.charAt(k) == '-')) k++;
+        if (k == j) return defaultValue;
+        try {
+            return Integer.parseInt(json.substring(j, k));
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     private static void waitForExit(Process process, int seconds) throws InterruptedException {

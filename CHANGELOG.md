@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- 長時間シナリオ対応: クライアント終了待ちをシナリオの `totalTicks`/`totalFrames` から算出（最大2時間）。ソケット読み取りタイムアウトを60分に延長。デフォルト `totalFrames` を 600 に変更。
+
+
 ## 1.2.3
 
 - Added per-frame `trackedBlocks` block-state telemetry for crop age and similar stateful tests.
