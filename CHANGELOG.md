@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.2.10
+
+### Added
+- Scenario option `slotCrops: [0, 5, …]`: each captured frame with a container GUI also writes `frames/slot-NNNNNN-SLOT.png` (per-slot crop) and records `{slot,item,count}` under `slotCrops` in `frames.jsonl`
+
+
 ## 1.2.9
 
 ### Fixed

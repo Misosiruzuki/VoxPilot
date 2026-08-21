@@ -1,4 +1,4 @@
-# VoxPilot 1.2.9
+# VoxPilot 1.2.10
 
 VoxPilot（ボックスパイロット）は、Forge 1.20.1（Forge 47.x）のMDKをJSONシナリオで実プレイ自動テストする単体Javaアプリです。`VoxPilot.jar` の中に開発環境用Forgeエージェントを内蔵しているため、対象Modへソースをコピーする必要はありません。
 
@@ -82,6 +82,7 @@ VoxPilotでは実測でエラーなく完走できた組み合わせだけを採
 | `totalTicks` | 指定時は計測開始からこのtick数でも終了（20 tick=1秒） |
 | `hotbar` | アクション中のホットバー選択（0-8） |
 | `containerClick` | 開いているコンテナGUIのスロットクリック（一度だけ）。`{"slot":29,"button":0,"type":"quick_move"}` |
+| `slotCrops`（シナリオ直下） | 例 `[0, 5, 37]`。コンテナGUI表示中のキャプチャで各スロットを `frames/slot-NNNNNN-SLOT.png` に切り出し。`frames.jsonl` に item/count も記録 |
 | `closeScreen` | true でコンテナを閉じる（一度だけ） |
 
 フレームJSONに `screen` / `hasContainerScreen` / `mainHand` / `carried` / `hotbarSelected` を記録します。

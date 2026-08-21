@@ -17,7 +17,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.server.MinecraftServer;
@@ -67,6 +69,7 @@ public final class ClientRuntime {
     private static int totalFrames;
     private static int totalTicks;
     private static int captureEvery;
+    private static final List<Integer> slotCrops = new ArrayList<>();
     private static Path outputDir;
     private static boolean active;
     private static boolean windowPositioned;
@@ -176,6 +179,12 @@ public final class ClientRuntime {
         totalFrames = integer(root, "totalFrames", 600);
         totalTicks = integer(root, "totalTicks", -1);
         captureEvery = integer(root, "captureEvery", 0);
+        slotCrops.clear();
+        if (root.has("slotCrops") && root.get("slotCrops").isJsonArray()) {
+            for (JsonElement element : root.getAsJsonArray("slotCrops")) {
+                slotCrops.add(element.getAsInt());
+            }
+        }
         warmupRemaining = integer(root, "warmupFrames", 20);
         commandsSent = false;
         scenarioStartGameTime = Long.MIN_VALUE;
@@ -412,11 +421,52 @@ public final class ClientRuntime {
             Path file = frames.resolve(String.format(Locale.ROOT, "frame-%06d.png", index));
             try (NativeImage image = net.minecraft.client.Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
                 image.writeToFile(file);
+                captureSlotCrops(mc, index, image, frames);
             }
             return file.toString();
         } catch (Exception exception) {
             send(error("capture", exception));
             return null;
+        }
+    }
+
+    /**
+     * When {@code slotCrops} is set and a container GUI is open, write per-slot
+     * crops as {@code frames/slot-NNNNNN-SLOT.png} (16x16 GUI pixels, scaled).
+     */
+    private static void captureSlotCrops(Minecraft mc, int index, NativeImage full, Path framesDir) {
+        if (slotCrops.isEmpty()) {
+            return;
+        }
+        if (!(mc.screen instanceof AbstractContainerScreen<?> screen)) {
+            return;
+        }
+        double scale = mc.getWindow().getGuiScale();
+        int imgW = full.getWidth();
+        int imgH = full.getHeight();
+        for (int slotIndex : slotCrops) {
+            if (slotIndex < 0 || slotIndex >= screen.getMenu().slots.size()) {
+                continue;
+            }
+            Slot slot = screen.getMenu().getSlot(slotIndex);
+            int x0 = (int) Math.round((screen.getGuiLeft() + slot.x) * scale);
+            int y0 = (int) Math.round((screen.getGuiTop() + slot.y) * scale);
+            int size = Math.max(1, (int) Math.round(16 * scale));
+            if (x0 < 0 || y0 < 0 || x0 + size > imgW || y0 + size > imgH) {
+                continue;
+            }
+            try (NativeImage crop = new NativeImage(size, size, false)) {
+                for (int dy = 0; dy < size; dy++) {
+                    for (int dx = 0; dx < size; dx++) {
+                        crop.setPixelRGBA(dx, dy, full.getPixelRGBA(x0 + dx, y0 + dy));
+                    }
+                }
+                Path out = framesDir.resolve(
+                        String.format(Locale.ROOT, "slot-%06d-%d.png", index, slotIndex));
+                crop.writeToFile(out);
+            } catch (Exception exception) {
+                send(error("slot_crop", exception));
+            }
         }
     }
 
@@ -486,6 +536,28 @@ public final class ClientRuntime {
         Screen screen = mc.screen;
         item.addProperty("screen", screen == null ? "" : screen.getClass().getName());
         item.addProperty("hasContainerScreen", screen instanceof AbstractContainerScreen<?>);
+        if (screen instanceof AbstractContainerScreen<?> containerScreen && !slotCrops.isEmpty()) {
+            JsonArray cropSlots = new JsonArray();
+            for (int slotIndex : slotCrops) {
+                if (slotIndex < 0 || slotIndex >= containerScreen.getMenu().slots.size()) {
+                    continue;
+                }
+                ItemStack stack = containerScreen.getMenu().getSlot(slotIndex).getItem();
+                JsonObject entry = new JsonObject();
+                entry.addProperty("slot", slotIndex);
+                if (stack.isEmpty()) {
+                    entry.addProperty("item", "");
+                    entry.addProperty("count", 0);
+                } else {
+                    entry.addProperty(
+                            "item",
+                            BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+                    entry.addProperty("count", stack.getCount());
+                }
+                cropSlots.add(entry);
+            }
+            item.add("slotCrops", cropSlots);
+        }
         if (mc.player != null) {
             item.addProperty("hotbarSelected", mc.player.getInventory().selected);
             ItemStack carried = mc.player.containerMenu.getCarried();
